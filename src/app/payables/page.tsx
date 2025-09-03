@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 
 type Invoice = { name: string; status?: string; posting_date?: string; due_date?: string; outstanding_amount?: number; supplier?: string };
 
@@ -15,6 +16,8 @@ export default function PayablesPage() {
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
+  const { show } = useToast();
+
   async function load() {
     setLoading(true);
     try {
@@ -24,6 +27,7 @@ export default function PayablesPage() {
       setInvoices(list as Invoice[]);
     } catch (e) {
       console.error(e);
+      show('Failed to load invoices', 'error');
       setInvoices([]);
     } finally {
       setLoading(false);
@@ -52,14 +56,9 @@ export default function PayablesPage() {
     try {
       await apiFetch(`/api/purchase-invoices`, { method: 'POST', body: JSON.stringify({ action: 'mark_paid', id: name }) });
       await load();
-      if (typeof window !== 'undefined') {
-        // lightweight toast via alert fallback
-        // Prefer ToastProvider, but keep alert for environments without it
-        // eslint-disable-next-line no-alert
-        alert('Marked as Paid');
-      }
+      show('Marked as Paid', 'success');
     } catch (e: any) {
-      alert(`Failed to mark paid: ${e?.data?.error || e.message}`);
+      show(`Failed to mark paid: ${e?.data?.error || e.message}`, 'error');
     }
   }
 

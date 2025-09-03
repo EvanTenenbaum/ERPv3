@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 
 type ERPList<T> = { data?: T[] } | T[];
 type Customer = { name: string; customer_name?: string; customer_type?: string; territory?: string };
@@ -21,6 +22,8 @@ export default function CustomersPage() {
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
+  const { show } = useToast();
+
   async function loadCustomers() {
     setLoading(true);
     try {
@@ -34,8 +37,9 @@ export default function CustomersPage() {
       params.set('limit_start', String(page * pageSize));
       const data = await apiFetch<any>(`/api/customers?${params.toString()}`);
       setCustomers(normalizeList<Customer>(data));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      show(`Failed to load customers${e?.data?.error?`: ${e.data.error}`:''}`, 'error');
       setCustomers([]);
     } finally {
       setLoading(false);
@@ -60,8 +64,9 @@ export default function CustomersPage() {
         const filters = encodeURIComponent(JSON.stringify([["Sales Order","customer","=",selected.customer_name || selected.name]]));
         const data = await apiFetch<any>(`/api/sales-orders?filters=${filters}&limit_page_length=5&order_by=transaction_date desc`);
         setOrders(normalizeList<SalesOrder>(data));
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
+        show(`Failed to load recent orders${e?.data?.error?`: ${e.data.error}`:''}`, 'error');
         setOrders([]);
       }
     }

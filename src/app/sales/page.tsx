@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 
 type SalesOrder = { name: string; status?: string; transaction_date?: string };
 type SalesOrderDoc = SalesOrder & { items?: Array<{ item_code: string; item_name?: string; qty?: number; rate?: number; amount?: number }>; customer?: string };
@@ -12,14 +13,17 @@ export default function SalesPage() {
   const [page, setPage] = useState(0);
   const pageSize = 20;
 
+  const { show } = useToast();
+
   async function load() {
     setLoading(true);
     try {
       const data = await apiFetch<any>(`/api/sales-orders?limit_page_length=${pageSize}&limit_start=${page*pageSize}&order_by=transaction_date desc`);
       const list = Array.isArray(data) ? data : (data?.data || []);
       setOrders(list as SalesOrder[]);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      show(`Failed to load orders${e?.data?.error?`: ${e.data.error}`:''}`, 'error');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -30,8 +34,9 @@ export default function SalesPage() {
     try {
       const doc = await apiFetch<any>(`/api/sales-orders?id=${encodeURIComponent(name)}`);
       setSelected((doc?.data || doc) as SalesOrderDoc);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      show(`Failed to load order ${name}${e?.data?.error?`: ${e.data.error}`:''}`, 'error');
     }
   }
 
