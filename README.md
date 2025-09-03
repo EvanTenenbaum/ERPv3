@@ -64,3 +64,18 @@ Test Plan (MVP)
   - `/payables` tabs filter lists; clicking "Mark as Paid" triggers request and refreshes list.
   - `/sales` lists orders; selecting one shows item lines in right panel.
 
+SQLite dev
+
+- Env:
+  - `DATABASE_URL=file:./dev.db`
+  - Prisma datasource uses `provider = "sqlite"` and `relationMode = "prisma"` in `prisma/schema.prisma`.
+  - `NEXTAUTH_URL=http://localhost:3000`
+  - `NEXTAUTH_SECRET=<random>`
+  - Optional login: `AUTH_USER`, `AUTH_PASS` (defaults to admin/admin)
+  - Optional ERPNext for live data: `NEXTERP_HOST`, `NEXTERP_API_KEY`, `NEXTERP_API_SECRET`
+- Install + DB initialize:
+  - `npm install`
+  - `npx prisma migrate dev --name init-sqlite || npx prisma db push`
+  - `npx prisma generate`
+- Run:
+  - `npm run dev` then open http://localhost:3000

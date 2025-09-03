@@ -7,9 +7,13 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const path = resourcePath('Purchase Invoice');
-  const res = await erpFetch(env, path, { method: 'GET', searchParams });
-  const text = await res.text();
-  return new NextResponse(text, { status: res.status, headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' } });
+  try {
+    const res = await erpFetch(env, path, { method: 'GET', searchParams });
+    const text = await res.text();
+    return new NextResponse(text, { status: res.status, headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' } });
+  } catch (e) {
+    return NextResponse.json({ error: 'nexterp_unreachable' }, { status: 503 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -22,12 +26,16 @@ export async function POST(req: Request) {
     // Attempt to mark the invoice as paid in ERPNext by updating the doc
     // Implementers may need to adjust fields depending on their workflow
     const payload = { status: 'Paid' } as any;
-    const res = await erpFetch(env, resourcePath('Purchase Invoice', String(id)), {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-    const text = await res.text();
-    return new NextResponse(text, { status: res.status, headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' } });
+    try {
+      const res = await erpFetch(env, resourcePath('Purchase Invoice', String(id)), {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      const text = await res.text();
+      return new NextResponse(text, { status: res.status, headers: { 'Content-Type': res.headers.get('Content-Type') || 'application/json' } });
+    } catch (e) {
+      return NextResponse.json({ error: 'nexterp_unreachable' }, { status: 503 });
+    }
   }
 
   return NextResponse.json({ error: 'unsupported_action' }, { status: 400 });

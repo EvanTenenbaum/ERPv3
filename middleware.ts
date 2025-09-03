@@ -4,7 +4,7 @@ export default withAuth({});
 
 export const config = {
   matcher: [
-    '/((?!api/auth|login|_next/|static/|.*\\.(?:png|jpg|jpeg|svg|ico|css|js)).*)',
+    // Exclude all API routes from auth middleware to allow server-side APIs without session
+    '/((?!api/|login|_next/|static/|.*\\.(?:png|jpg|jpeg|svg|ico|css|js)).*)',
   ],
 };
-

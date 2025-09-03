@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider    = "sqlite"
+  url         = env("DATABASE_URL")
+  relationMode = "prisma"
 }
 
 // User Management
@@ -436,8 +437,8 @@ model IntakePhoto {
 
   // Relations
   user    User     @relation("UploadedBy", fields: [uploadedBy], references: [id])
-  product Product? @relation(fields: [parentId], references: [id], map: "intake_photos_product_fkey")
-  batch   Batch?   @relation(fields: [parentId], references: [id], map: "intake_photos_batch_fkey")
+  product Product? @relation(fields: [parentId], references: [id])
+  batch   Batch?   @relation(fields: [parentId], references: [id])
 
   @@map("intake_photos")
 }
