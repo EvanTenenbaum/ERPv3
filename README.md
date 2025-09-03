@@ -30,8 +30,12 @@ Vercel Deploy
 - Build/Run: Next.js defaults (`npm run build` / `npm start`).
 - See `vercel.json` for mapping to Vercel env secrets.
 
+CI
+
+- PR build: `.github/workflows/vercel-preview.yml` builds Next.js on pull requests to main (no secrets required) to catch regressions.
+- Uptime: optional `.github/workflows/uptime-health.yml` pings your deployed health endpoint on a schedule. Configure repository Secret or Actions Variable `HEALTH_URL` to `https://<your-app>.vercel.app/api/health`.
+
 Health & Smoke Tests
 
 - Health: `GET /api/health` → `{ "ok": true }`
 - ERPNext (read-only): see `docs/deploy-smoke.md` for curl examples.
-
