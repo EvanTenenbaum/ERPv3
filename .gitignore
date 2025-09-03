@@ -33,8 +33,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Prisma
-/prisma/migrations/
+# Prisma (commit migrations)
 
 # IDE
 .vscode/
@@ -44,4 +43,3 @@ next-env.d.ts
 
 # OS
 Thumbs.db
-

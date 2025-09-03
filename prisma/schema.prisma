@@ -441,4 +441,3 @@ model IntakePhoto {
 
   @@map("intake_photos")
 }
-

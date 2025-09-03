@@ -30,6 +30,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "next": "^14.0.0",
+    "next-auth": "^4.24.7",
     "postcss": "^8.0.0",
     "prisma": "^5.22.0",
     "puppeteer": "^24.16.1",
