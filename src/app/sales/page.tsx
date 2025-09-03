@@ -12,13 +12,15 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const pageSize = 20;
+  const [sortKey, setSortKey] = useState<'transaction_date'|'status'|'name'>('transaction_date');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('desc');
 
   const { show } = useToast();
 
   async function load() {
     setLoading(true);
     try {
-      const data = await apiFetch<any>(`/api/sales-orders?limit_page_length=${pageSize}&limit_start=${page*pageSize}&order_by=transaction_date desc`);
+      const data = await apiFetch<any>(`/api/sales-orders?limit_page_length=${pageSize}&limit_start=${page*pageSize}&order_by=${sortKey} ${sortDir}`);
       const list = Array.isArray(data) ? data : (data?.data || []);
       setOrders(list as SalesOrder[]);
     } catch (e: any) {
@@ -40,7 +42,7 @@ export default function SalesPage() {
     }
   }
 
-  useEffect(() => { load(); }, [page]);
+  useEffect(() => { load(); }, [page, sortKey, sortDir]);
 
   return (
     <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -51,19 +53,27 @@ export default function SalesPage() {
           <span className="text-sm text-gray-600">Page {page+1}</span>
           <button disabled={orders.length<pageSize || loading} onClick={()=>setPage(p=>p+1)} className="px-2 py-1 border rounded disabled:opacity-50">Next</button>
         </div>
-        <div className="border rounded overflow-auto">
+        <div className="border rounded overflow-auto max-h-[70vh]">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left">
+            <thead className="bg-gray-50 text-left sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-2">Order</th>
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2 cursor-pointer" onClick={()=>toggleSort('name')}>Order {arrow('name')}</th>
+                <th className="px-3 py-2 cursor-pointer" onClick={()=>toggleSort('transaction_date')}>Date {arrow('transaction_date')}</th>
+                <th className="px-3 py-2 cursor-pointer" onClick={()=>toggleSort('status')}>Status {arrow('status')}</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td className="px-3 py-3" colSpan={3}>Loading...</td></tr> : (
-                orders.map(o => (
-                  <tr key={o.name} className="hover:bg-gray-50 cursor-pointer" onClick={()=>loadOrder(o.name)}>
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-2/3" /></td>
+                    <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-1/4" /></td>
+                    <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-1/5" /></td>
+                  </tr>
+                ))
+              ) : (
+                orders.map((o, idx) => (
+                  <tr key={o.name} className={`${idx%2?'bg-white':'bg-gray-50/50'} hover:bg-gray-50 cursor-pointer`} onClick={()=>loadOrder(o.name)}>
                     <td className="px-3 py-2">{o.name}</td>
                     <td className="px-3 py-2">{o.transaction_date || '-'}</td>
                     <td className="px-3 py-2">
@@ -111,6 +121,11 @@ export default function SalesPage() {
                   ))}
                   {(!selected.items || selected.items.length === 0) && <tr><td className="px-3 py-3" colSpan={3}>No items</td></tr>}
                 </tbody>
+  function toggleSort(key: 'transaction_date'|'status'|'name') {
+    if (sortKey === key) setSortDir(d=>d==='asc'?'desc':'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  }
+  const arrow = (k: string) => sortKey===k ? (sortDir==='asc'?'↑':'↓') : '';
               </table>
             </div>
           </div>

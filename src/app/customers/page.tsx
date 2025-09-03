@@ -21,6 +21,8 @@ export default function CustomersPage() {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [page, setPage] = useState(0);
   const pageSize = 20;
+  const [sortKey, setSortKey] = useState<'customer_name'|'customer_type'|'territory'>('customer_name');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
   const { show } = useToast();
 
@@ -35,6 +37,7 @@ export default function CustomersPage() {
       }
       params.set('limit_page_length', String(pageSize));
       params.set('limit_start', String(page * pageSize));
+      params.set('order_by', `${sortKey} ${sortDir}`);
       const data = await apiFetch<any>(`/api/customers?${params.toString()}`);
       setCustomers(normalizeList<Customer>(data));
     } catch (e: any) {
@@ -55,7 +58,18 @@ export default function CustomersPage() {
     const t = setTimeout(loadCustomers, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, page]);
+  }, [query, page, sortKey, sortDir]);
+
+  function toggleSort(key: 'customer_name'|'customer_type'|'territory') {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
+  const arrow = (key: string) => sortKey === key ? (sortDir === 'asc' ? '↑' : '↓') : '';
 
   useEffect(() => {
     async function loadOrders() {
@@ -89,23 +103,29 @@ export default function CustomersPage() {
         <span className="text-sm text-gray-600">Page {page+1}</span>
         <button disabled={customers.length<pageSize || loading} onClick={()=>setPage(p=>p+1)} className="px-2 py-1 border rounded disabled:opacity-50">Next</button>
       </div>
-      <div className="overflow-auto border rounded">
+      <div className="overflow-auto border rounded max-h-[70vh]">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left">
+          <thead className="bg-gray-50 text-left sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Type</th>
-              <th className="px-3 py-2">Territory</th>
+              <th className="px-3 py-2 cursor-pointer select-none" onClick={()=>toggleSort('customer_name')}>Name {arrow('customer_name')}</th>
+              <th className="px-3 py-2 cursor-pointer select-none" onClick={()=>toggleSort('customer_type')}>Type {arrow('customer_type')}</th>
+              <th className="px-3 py-2 cursor-pointer select-none" onClick={()=>toggleSort('territory')}>Territory {arrow('territory')}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-3 py-3" colSpan={3}>Loading...</td></tr>
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} className="animate-pulse">
+                  <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-2/3" /></td>
+                  <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-1/2" /></td>
+                  <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-1/3" /></td>
+                </tr>
+              ))
             ) : customers.length === 0 ? (
               <tr><td className="px-3 py-3" colSpan={3}>No customers</td></tr>
             ) : (
-              customers.map((c) => (
-                <tr key={c.name} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelected(c)}>
+              customers.map((c, idx) => (
+                <tr key={c.name} className={`cursor-pointer ${idx % 2 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-gray-50`} onClick={() => setSelected(c)}>
                   <td className="px-3 py-2">{c.customer_name || c.name}</td>
                   <td className="px-3 py-2">{c.customer_type || '-'}</td>
                   <td className="px-3 py-2">{c.territory || '-'}</td>

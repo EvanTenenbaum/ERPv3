@@ -15,6 +15,8 @@ export default function PayablesPage() {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
   const pageSize = 20;
+  const [sortKey, setSortKey] = useState<'due_date'|'outstanding_amount'|'name'>('due_date');
+  const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
 
   const { show } = useToast();
 
@@ -22,7 +24,7 @@ export default function PayablesPage() {
     setLoading(true);
     try {
       const filters = encodeURIComponent(JSON.stringify([["Purchase Invoice","status","!=","Paid"]]));
-      const data = await apiFetch<any>(`/api/purchase-invoices?filters=${filters}&limit_page_length=${pageSize}&limit_start=${page*pageSize}&order_by=due_date asc`);
+      const data = await apiFetch<any>(`/api/purchase-invoices?filters=${filters}&limit_page_length=${pageSize}&limit_start=${page*pageSize}&order_by=${sortKey} ${sortDir}`);
       const list = Array.isArray(data) ? data : (data?.data || []);
       setInvoices(list as Invoice[]);
     } catch (e) {
@@ -34,7 +36,13 @@ export default function PayablesPage() {
     }
   }
 
-  useEffect(() => { load(); }, [page]);
+  useEffect(() => { load(); }, [page, sortKey, sortDir]);
+
+  function toggleSort(key: 'due_date'|'outstanding_amount'|'name') {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  }
+  const arrow = (k: string) => sortKey === k ? (sortDir==='asc'?'↑':'↓') : '';
 
   const now = new Date();
   const soonCutoff = new Date(); soonCutoff.setDate(now.getDate() + 7);
@@ -70,21 +78,31 @@ export default function PayablesPage() {
         <button className={`px-3 py-1 rounded ${tab==='soon'?'bg-blue-600 text-white':'bg-gray-100'}`} onClick={()=>setTab('soon')}>Due Soon</button>
         <button className={`px-3 py-1 rounded ${tab==='overdue'?'bg-blue-600 text-white':'bg-gray-100'}`} onClick={()=>setTab('overdue')}>Overdue</button>
       </div>
-      <div className="border rounded overflow-auto">
+      <div className="border rounded overflow-auto max-h-[70vh]">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left">
+          <thead className="bg-gray-50 text-left sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2">Invoice</th>
+              <th className="px-3 py-2 cursor-pointer" onClick={()=>toggleSort('name')}>Invoice {arrow('name')}</th>
               <th className="px-3 py-2">Supplier</th>
-              <th className="px-3 py-2">Due Date</th>
-              <th className="px-3 py-2">Outstanding</th>
+              <th className="px-3 py-2 cursor-pointer" onClick={()=>toggleSort('due_date')}>Due Date {arrow('due_date')}</th>
+              <th className="px-3 py-2 cursor-pointer" onClick={()=>toggleSort('outstanding_amount')}>Outstanding {arrow('outstanding_amount')}</th>
               <th className="px-3 py-2">Action</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? <tr><td className="px-3 py-3" colSpan={5}>Loading...</td></tr> : (
-              filtered.map(inv => (
-                <tr key={inv.name}>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i} className="animate-pulse">
+                  <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-2/3" /></td>
+                  <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-1/2" /></td>
+                  <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-1/3" /></td>
+                  <td className="px-3 py-2"><div className="h-3 bg-gray-200 rounded w-1/4" /></td>
+                  <td className="px-3 py-2"></td>
+                </tr>
+              ))
+            ) : (
+              filtered.map((inv, idx) => (
+                <tr key={inv.name} className={`${idx%2?'bg-white':'bg-gray-50/50'}`}>
                   <td className="px-3 py-2">{inv.name}</td>
                   <td className="px-3 py-2">{inv.supplier || '-'}</td>
                   <td className="px-3 py-2">{inv.due_date || '-'}</td>
