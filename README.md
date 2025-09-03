@@ -79,3 +79,14 @@ SQLite dev
   - `npx prisma generate`
 - Run:
   - `npm run dev` then open http://localhost:3000
+
+Postgres dev (Neon)
+
+- Create a Neon database and set:
+  - `DATABASE_URL=postgresql://<user>:<password>@<host>/<database>?schema=public`
+- Prisma datasource in `prisma/schema.prisma` is configured for Postgres.
+- Initialize and run:
+  - `npm install`
+  - `npx prisma migrate dev --name init`
+  - `npx prisma generate`
+  - `npm run dev` then open http://localhost:3000
