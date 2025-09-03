@@ -10,7 +10,9 @@
     "NEXTAUTH_URL": "@nextauth_url",
     "NEXTERP_HOST": "@nexterp_host",
     "NEXTERP_API_KEY": "@nexterp_api_key",
-    "NEXTERP_API_SECRET": "@nexterp_api_secret"
+    "NEXTERP_API_SECRET": "@nexterp_api_secret",
+    "UPLOAD_DIR": "@upload_dir",
+    "MAX_FILE_SIZE": "@max_file_size"
   },
   "build": {
     "env": {
