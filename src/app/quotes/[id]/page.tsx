@@ -16,9 +16,12 @@ export default async function QuotePage({ params }: QuotePageProps) {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <QuoteDetails quote={quoteResponse.quote} />
+    <div className="px-4 py-4">
+      <div className="text-sm text-gray-600 mb-2"><a href="/quotes" className="text-blue-700 hover:underline">Quotes</a> / <span className="text-gray-800">{params.id}</span></div>
+      <h1 className="text-2xl font-semibold mb-4">Quote {params.id}</h1>
+      <div className="container mx-auto">
+        <QuoteDetails quote={quoteResponse.quote} />
+      </div>
     </div>
   );
 }
-
