@@ -18,6 +18,8 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<SalesOrder[]>([]);
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
 
   async function loadCustomers() {
     setLoading(true);
@@ -28,7 +30,8 @@ export default function CustomersPage() {
         const filters = JSON.stringify([["Customer","customer_name","like",`%${query.trim()}%`]]);
         params.set('filters', filters);
       }
-      params.set('limit_page_length', '20');
+      params.set('limit_page_length', String(pageSize));
+      params.set('limit_start', String(page * pageSize));
       const data = await apiFetch<any>(`/api/customers?${params.toString()}`);
       setCustomers(normalizeList<Customer>(data));
     } catch (e) {
@@ -48,7 +51,7 @@ export default function CustomersPage() {
     const t = setTimeout(loadCustomers, 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [query, page]);
 
   useEffect(() => {
     async function loadOrders() {
@@ -75,6 +78,11 @@ export default function CustomersPage() {
           placeholder="Search customers..."
           className="border rounded px-3 py-2 w-full max-w-md"
         />
+      </div>
+      <div className="mb-2 flex items-center gap-2">
+        <button disabled={page===0 || loading} onClick={()=>setPage(p=>Math.max(0,p-1))} className="px-2 py-1 border rounded disabled:opacity-50">Prev</button>
+        <span className="text-sm text-gray-600">Page {page+1}</span>
+        <button disabled={customers.length<pageSize || loading} onClick={()=>setPage(p=>p+1)} className="px-2 py-1 border rounded disabled:opacity-50">Next</button>
       </div>
       <div className="overflow-auto border rounded">
         <table className="min-w-full text-sm">

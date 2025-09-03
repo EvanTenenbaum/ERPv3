@@ -9,11 +9,13 @@ export default function SalesPage() {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [selected, setSelected] = useState<SalesOrderDoc | null>(null);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
 
   async function load() {
     setLoading(true);
     try {
-      const data = await apiFetch<any>(`/api/sales-orders?limit_page_length=50&order_by=transaction_date desc`);
+      const data = await apiFetch<any>(`/api/sales-orders?limit_page_length=${pageSize}&limit_start=${page*pageSize}&order_by=transaction_date desc`);
       const list = Array.isArray(data) ? data : (data?.data || []);
       setOrders(list as SalesOrder[]);
     } catch (e) {
@@ -33,12 +35,17 @@ export default function SalesPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [page]);
 
   return (
     <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div className="lg:col-span-2">
         <h1 className="text-2xl font-semibold mb-4">Sales Orders</h1>
+        <div className="mb-2 flex items-center gap-2">
+          <button disabled={page===0 || loading} onClick={()=>setPage(p=>Math.max(0,p-1))} className="px-2 py-1 border rounded disabled:opacity-50">Prev</button>
+          <span className="text-sm text-gray-600">Page {page+1}</span>
+          <button disabled={orders.length<pageSize || loading} onClick={()=>setPage(p=>p+1)} className="px-2 py-1 border rounded disabled:opacity-50">Next</button>
+        </div>
         <div className="border rounded overflow-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 text-left">

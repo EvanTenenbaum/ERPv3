@@ -12,12 +12,14 @@ export default function PayablesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [tab, setTab] = useState<'open'|'soon'|'overdue'>('open');
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
 
   async function load() {
     setLoading(true);
     try {
       const filters = encodeURIComponent(JSON.stringify([["Purchase Invoice","status","!=","Paid"]]));
-      const data = await apiFetch<any>(`/api/purchase-invoices?filters=${filters}&limit_page_length=50&order_by=due_date asc`);
+      const data = await apiFetch<any>(`/api/purchase-invoices?filters=${filters}&limit_page_length=${pageSize}&limit_start=${page*pageSize}&order_by=due_date asc`);
       const list = Array.isArray(data) ? data : (data?.data || []);
       setInvoices(list as Invoice[]);
     } catch (e) {
@@ -28,7 +30,7 @@ export default function PayablesPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [page]);
 
   const now = new Date();
   const soonCutoff = new Date(); soonCutoff.setDate(now.getDate() + 7);
@@ -50,7 +52,12 @@ export default function PayablesPage() {
     try {
       await apiFetch(`/api/purchase-invoices`, { method: 'POST', body: JSON.stringify({ action: 'mark_paid', id: name }) });
       await load();
-      alert('Marked as Paid');
+      if (typeof window !== 'undefined') {
+        // lightweight toast via alert fallback
+        // Prefer ToastProvider, but keep alert for environments without it
+        // eslint-disable-next-line no-alert
+        alert('Marked as Paid');
+      }
     } catch (e: any) {
       alert(`Failed to mark paid: ${e?.data?.error || e.message}`);
     }
@@ -92,6 +99,11 @@ export default function PayablesPage() {
             {!loading && filtered.length === 0 && <tr><td className="px-3 py-3" colSpan={5}>No invoices</td></tr>}
           </tbody>
         </table>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <button disabled={page===0 || loading} onClick={()=>setPage(p=>Math.max(0,p-1))} className="px-2 py-1 border rounded disabled:opacity-50">Prev</button>
+        <span className="text-sm text-gray-600">Page {page+1}</span>
+        <button disabled={invoices.length<pageSize || loading} onClick={()=>setPage(p=>p+1)} className="px-2 py-1 border rounded disabled:opacity-50">Next</button>
       </div>
     </div>
   );

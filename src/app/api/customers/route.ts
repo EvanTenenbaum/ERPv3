@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { erpFetch, readERPEnv, resourcePath } from '@/lib/server/erpnext';
+import { ipFromHeaders, rateLimit } from '@/lib/rateLimit';
 
 export async function GET(req: Request) {
+  const ip = ipFromHeaders(new Headers(req.headers));
+  if (!rateLimit(`cust:${ip}`)) {
+    return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
+  }
   const env = readERPEnv();
   if (!env) {
     return NextResponse.json({ error: 'nexterp_credentials_missing' }, { status: 503 });
