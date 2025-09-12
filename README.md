@@ -14,9 +14,28 @@ Local Dev (Postgres)
   - Optional: `AUTH_USER`, `AUTH_PASS` (defaults to admin/admin)
   - Optional: `NEXTERP_HOST`, `NEXTERP_API_KEY`, `NEXTERP_API_SECRET`
 - Commands:
-  - `npm install`
+  - `npm ci` (or `npm install`)
   - `npx prisma migrate dev --name init && npx prisma generate`
+  - `npm run build` (sanity build)
+  - `npm test` (unit + e2e where applicable)
   - `npm run dev` → http://localhost:3000
+
+Validation Commands
+
+- Local validation (pre-commit / pre-push):
+  - `npm ci`
+  - `npm run build`
+  - `npm test`
+  - `npm run dev`
+
+Live Deployment Checks
+
+- Replace `<your-app>` with your Vercel URL and verify:
+  - `GET https://<your-app>.vercel.app/api/health` → `{ ok: true }`
+  - `GET https://<your-app>.vercel.app/` renders Home
+  - `GET https://<your-app>.vercel.app/inventory` renders Inventory
+  - `GET https://<your-app>.vercel.app/quotes` and `/quotes/new` render
+  - `GET https://<your-app>.vercel.app/search` renders
 
 Vercel Deploy
 
@@ -52,6 +71,10 @@ CI
 
 - PR build: `.github/workflows/vercel-preview.yml` builds Next.js on pull requests to main (no secrets required) to catch regressions.
 - Uptime: optional `.github/workflows/uptime-health.yml` pings your deployed health endpoint on a schedule. Configure repository Secret or Actions Variable `HEALTH_URL` to `https://<your-app>.vercel.app/api/health`.
+
+Milestone & Issues
+
+- Create milestone: `v0 Beta (M0–M5)` and issues per `docs/roadmap-issues.md`.
 
 Health & Smoke Tests
 
