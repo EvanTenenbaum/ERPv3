@@ -5,6 +5,17 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
+  // Idempotency guard: if products already exist, assume database is seeded
+  try {
+    const existingProducts = await prisma.product.count();
+    if (existingProducts > 0) {
+      console.log(`ℹ️ Seed skipped: found ${existingProducts} existing products.`);
+      return;
+    }
+  } catch (e) {
+    console.warn('⚠️ Could not check existing data, continuing with seed...', e?.message || e);
+  }
+
   // Create Users
   console.log('Creating users...');
   const superAdmin = await prisma.user.create({
@@ -534,4 +545,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

@@ -16,6 +16,7 @@ Local Dev (Postgres)
 - Commands:
   - `npm ci` (or `npm install`)
   - `npx prisma migrate dev --name init && npx prisma generate`
+  - `npm run db:seed` (idempotent: skips if data exists)
   - `npm run build` (sanity build)
   - `npm test` (unit + e2e where applicable)
   - `npm run dev` → http://localhost:3000
