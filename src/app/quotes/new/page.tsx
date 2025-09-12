@@ -74,12 +74,10 @@ export default function NewQuotePage() {
         customerId: selectedCustomerId,
         items: items.map(item => ({
           productId: item.productId,
-          batchId: item.batchId,
-          inventoryLotId: item.inventoryLotId,
           quantity: item.quantity,
           unitPrice: item.price
         })),
-        notes,
+        // notes are currently not persisted by createQuote; kept for future use
         validUntil: validUntil ? new Date(validUntil) : undefined
       };
 
@@ -295,4 +293,3 @@ export default function NewQuotePage() {
     </div>
   );
 }
-
