@@ -1,8 +1,6 @@
 'use server';
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 export interface SearchFilters {
   keyword?: string;
@@ -31,6 +29,8 @@ export interface SearchResult {
   lotNumber?: string;
   photos: string[];
 }
+
+import { getEffectiveUnitPrice } from '@/lib/pricing';
 
 export async function searchProducts(filters: SearchFilters = {}): Promise<SearchResult[]> {
   try {
@@ -121,6 +121,8 @@ export async function searchProducts(filters: SearchFilters = {}): Promise<Searc
       // Apply availability filter
       if (availability && availabilityStatus !== availability) continue;
 
+      const effectivePrice = await getEffectiveUnitPrice(prisma as any, product.id);
+
       results.push({
         id: product.id,
         name: product.name,
@@ -129,7 +131,7 @@ export async function searchProducts(filters: SearchFilters = {}): Promise<Searc
         unit: product.unit,
         location: product.location || undefined,
         defaultPrice: product.defaultPrice,
-        currentPrice: product.defaultPrice, // TODO: Implement price book logic
+        currentPrice: effectivePrice,
         availability: availabilityStatus,
         quantityAvailable,
         vendorCode: batch.vendor.vendorCode,
@@ -186,4 +188,3 @@ export async function getSearchFilterOptions() {
     };
   }
 }
-

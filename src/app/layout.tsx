@@ -1,6 +1,8 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { CartProvider } from '@/hooks/useCart'
+import AppShell from '@/components/layout/AppShell'
+import { getCurrentRole } from '@/lib/auth'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -14,14 +16,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const role = getCurrentRole()
   return (
     <html lang="en">
       <body className={inter.className}>
         <CartProvider>
-          {children}
+          <AppShell role={role}>
+            {children}
+          </AppShell>
         </CartProvider>
       </body>
     </html>
   )
 }
-

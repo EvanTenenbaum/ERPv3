@@ -40,6 +40,14 @@ export default defineConfig({
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
     },
+    {
+      name: 'chromium-390',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 390, height: 844 } },
+    },
+    {
+      name: 'chromium-1280',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+    },
 
     /* Test against mobile viewports. */
     // {
@@ -66,7 +74,6 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
 });
-
