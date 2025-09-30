@@ -5,6 +5,9 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
+  // Ensure System Status singleton exists
+  await prisma.systemStatus.upsert({ where: { id: 'singleton' }, update: {}, create: { id: 'singleton', postingLocked: false } });
+
   // Create Users
   console.log('Creating users...');
   const superAdmin = await prisma.user.create({
@@ -69,6 +72,13 @@ async function main() {
     }),
   ]);
 
+  // Link Vendors to Parties
+  console.log('Linking vendors to parties...');
+  for (const v of vendors) {
+    const party = await prisma.party.create({ data: { name: v.companyName, isVendor: true, isActive: true, contactInfo: v.contactInfo || {} } });
+    await prisma.vendor.update({ where: { id: v.id }, data: { partyId: party.id } });
+  }
+
   // Create Customers
   console.log('Creating customers...');
   const customers = await Promise.all([
@@ -109,6 +119,13 @@ async function main() {
       },
     }),
   ]);
+
+  // Link Customers to Parties
+  console.log('Linking customers to parties...');
+  for (const c of customers) {
+    const party = await prisma.party.create({ data: { name: c.companyName, isCustomer: true, isActive: true, contactInfo: c.contactInfo || {} } });
+    await prisma.customer.update({ where: { id: c.id }, data: { partyId: party.id } });
+  }
 
   // Create Products
   console.log('Creating products...');
@@ -534,4 +551,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-

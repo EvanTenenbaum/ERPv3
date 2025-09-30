@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+"use client";
+import { useEffect, useState } from 'react';
+import { useToast } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
 
 export default function NewBatchPage() {
@@ -17,21 +19,52 @@ export default function NewBatchPage() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { push } = useToast();
+  const [products, setProducts] = useState<{id:string; name:string}[]>([])
+  const [vendors, setVendors] = useState<{id:string; vendorCode:string; companyName:string}[]>([])
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [pRes, vRes] = await Promise.all([
+          fetch('/api/products'),
+          fetch('/api/vendors')
+        ])
+        const pData = await pRes.json()
+        const vData = await vRes.json()
+        if (pData?.success) setProducts(pData.products)
+        if (vData?.success) setVendors(vData.vendors)
+      } catch (e) {
+        console.error('Failed to load options', e)
+      }
+    })()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      // TODO: Implement batch creation API call
-      console.log('Creating batch:', formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      router.push('/inventory/batches');
+      const res = await fetch('/api/inventory/batches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: formData.productId,
+          vendorId: formData.vendorId,
+          batchNumber: formData.batchNumber,
+          receivedDate: formData.receivedDate,
+          expirationDate: formData.expirationDate || undefined,
+          quantity: Number(formData.quantity),
+          initialCost: Number(formData.initialCost || 0),
+        })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data.error || 'create_failed')
+      push({ message: 'Batch created' });
+      router.push('/inventory/products');
     } catch (error) {
       console.error('Error creating batch:', error);
+      push({ message: 'Failed to create batch' })
     } finally {
       setIsSubmitting(false);
     }
@@ -86,7 +119,9 @@ export default function NewBatchPage() {
                 className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="">Select Product</option>
-                {/* Product options will be populated dynamically */}
+                {products.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -104,7 +139,9 @@ export default function NewBatchPage() {
               className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">Select Vendor</option>
-              {/* Vendor options will be populated dynamically with vendor codes */}
+              {vendors.map(v => (
+                <option key={v.id} value={v.id}>{v.vendorCode} — {v.companyName}</option>
+              ))}
             </select>
           </div>
 
@@ -195,7 +232,7 @@ export default function NewBatchPage() {
           <div className="bg-blue-50 p-4 rounded-md">
             <h4 className="text-sm font-medium text-blue-800 mb-2">Cost History</h4>
             <p className="text-sm text-blue-700">
-              An initial BatchCost record will be created with the specified unit cost and today's date as the effective date. 
+              An initial BatchCost record will be created with the specified unit cost and today&apos;s date as the effective date. 
               You can add cost changes later that will only affect future allocations.
             </p>
           </div>
@@ -221,4 +258,3 @@ export default function NewBatchPage() {
     </div>
   );
 }
-

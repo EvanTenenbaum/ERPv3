@@ -7,9 +7,7 @@
  * Key Business Rule: COGS = BatchCost active at allocationDate for each OrderItem
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 /**
  * Get the active BatchCost for a given batch at a specific date
@@ -18,26 +16,21 @@ const prisma = new PrismaClient();
  * @param atDate - The date to check for active cost (typically allocationDate)
  * @returns The active BatchCost record or null if none found
  */
-export async function getActiveBatchCost(batchId: string, atDate: Date) {
+export async function getActiveBatchCostDb(db: Pick<typeof prisma, 'batchCost'> | any, batchId: string, atDate: Date) {
   try {
-    // Find the most recent BatchCost record where effectiveFrom <= atDate
-    const activeCost = await prisma.batchCost.findFirst({
-      where: {
-        batchId: batchId,
-        effectiveFrom: {
-          lte: atDate
-        }
-      },
-      orderBy: {
-        effectiveFrom: 'desc'
-      }
-    });
-
-    return activeCost;
+    const activeCost = await db.batchCost.findFirst({
+      where: { batchId, effectiveFrom: { lte: atDate } },
+      orderBy: { effectiveFrom: 'desc' },
+    })
+    return activeCost
   } catch (error) {
-    console.error('Error fetching active batch cost:', error);
-    throw new Error(`Failed to get active batch cost for batch ${batchId}`);
+    console.error('Error fetching active batch cost:', error)
+    throw new Error(`Failed to get active batch cost for batch ${batchId}`)
   }
+}
+
+export async function getActiveBatchCost(batchId: string, atDate: Date) {
+  return getActiveBatchCostDb(prisma, batchId, atDate)
 }
 
 /**
@@ -173,10 +166,8 @@ export async function createBatchCost(
  * @returns Formatted dollar amount as string
  */
 export function formatCostForDisplay(cents: number): string {
-  if (cents === null || cents === undefined) {
-    return '$0.00';
-  }
-  return `$${(cents / 100).toFixed(2)}`;
+  if (cents === null || cents === undefined) return '$0.00'
+  return `$${(cents / 100).toFixed(2)}`
 }
 
 /**
@@ -196,4 +187,3 @@ export function parseCostToCents(dollarAmount: string | number): number {
   
   return Math.round(amount * 100);
 }
-

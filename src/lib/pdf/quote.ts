@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import { getVendorDisplayName } from '@/lib/vendorDisplay';
 
 interface QuoteData {
   id: string;
@@ -10,8 +9,8 @@ interface QuoteData {
   notes?: string | null;
   customer: {
     companyName: string;
-    contactName: string;
-    email: string;
+    contactName?: string | null;
+    email?: string | null;
     phone?: string | null;
     address?: string | null;
     city?: string | null;
@@ -22,23 +21,17 @@ interface QuoteData {
     id: string;
     quantity: number;
     unitPrice: number;
-    totalPrice: number;
+    totalPrice?: number;
+    lineTotal?: number;
     product: {
       sku: string;
       name: string;
+      customerFacingName?: string | null;
       description?: string | null;
       unit: string;
     };
-    batch: {
-      batchNumber: string;
-      vendor: {
-        vendorCode: string;
-        companyName: string;
-      };
-    };
-    inventoryLot: {
-      location: string;
-    };
+    vendorCode?: string;
+    location?: string;
   }>;
 }
 
@@ -49,8 +42,8 @@ export function generateQuotePDF(quote: QuoteData): jsPDF {
   const margin = 20;
   let yPosition = margin;
 
-  // Helper function to format currency (whole numbers)
-  const formatCurrency = (amount: number) => `$${Math.round(amount / 100)}`;
+  // Helper function to format currency (two decimals)
+  const formatCurrency = (amount: number) => `$${(amount / 100).toFixed(2)}`;
 
   // Helper function to format date
   const formatDate = (date: Date) => date.toLocaleDateString('en-US', {
@@ -62,7 +55,7 @@ export function generateQuotePDF(quote: QuoteData): jsPDF {
   // Header
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text('SALES QUOTE', pageWidth / 2, yPosition, { align: 'center' });
+  doc.text('SALES SHEET', pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 15;
 
   // Quote number and date
@@ -89,10 +82,14 @@ export function generateQuotePDF(quote: QuoteData): jsPDF {
   doc.setFont('helvetica', 'normal');
   doc.text(quote.customer.companyName, margin, yPosition);
   yPosition += 6;
-  doc.text(quote.customer.contactName, margin, yPosition);
-  yPosition += 6;
-  doc.text(quote.customer.email, margin, yPosition);
-  yPosition += 6;
+  if (quote.customer.contactName) {
+    doc.text(quote.customer.contactName, margin, yPosition);
+    yPosition += 6;
+  }
+  if (quote.customer.email) {
+    doc.text(quote.customer.email, margin, yPosition);
+    yPosition += 6;
+  }
 
   if (quote.customer.phone) {
     doc.text(quote.customer.phone, margin, yPosition);
@@ -188,18 +185,20 @@ export function generateQuotePDF(quote: QuoteData): jsPDF {
     xPosition += colWidths.sku;
 
     // Description (truncate if too long)
-    const description = item.product.name + (item.product.description ? ` - ${item.product.description}` : '');
+    const displayName = (item.product as any).customerFacingName || item.product.name;
+    const description = displayName + (item.product.description ? ` - ${item.product.description}` : '');
     const truncatedDescription = description.length > 35 ? description.substring(0, 32) + '...' : description;
     doc.text(truncatedDescription, xPosition, yPosition + 4);
     xPosition += colWidths.description;
 
-    // Vendor (use vendor code for masking)
-    const vendorDisplay = getVendorDisplayName(item.batch.vendor);
-    doc.text(vendorDisplay, xPosition, yPosition + 4);
+    // Vendor (masked code if available)
+    const vendorDisplay = item.vendorCode || '';
+    doc.text(vendorDisplay || '-', xPosition, yPosition + 4);
     xPosition += colWidths.vendor;
 
-    // Location
-    doc.text(item.inventoryLot.location, xPosition, yPosition + 4);
+    // Location (optional)
+    const locationText = item.location || '';
+    doc.text(locationText || '-', xPosition, yPosition + 4);
     xPosition += colWidths.location;
 
     // Quantity
@@ -215,7 +214,8 @@ export function generateQuotePDF(quote: QuoteData): jsPDF {
     xPosition += colWidths.price;
 
     // Total Price
-    doc.text(formatCurrency(item.totalPrice), xPosition, yPosition + 4);
+    const lineTotal = item.totalPrice ?? item.lineTotal ?? item.unitPrice * item.quantity;
+    doc.text(formatCurrency(lineTotal), xPosition, yPosition + 4);
 
     yPosition += 10;
   });
@@ -279,3 +279,32 @@ export function downloadQuotePDF(quote: QuoteData, filename?: string) {
   doc.save(fileName);
 }
 
+// Sales sheet helpers
+export async function generateSalesSheetPDF(quote: any): Promise<jsPDF> {
+  const doc = new jsPDF();
+  doc.setFontSize(18);
+  doc.text('SALES SHEET', 10, 10);
+
+  doc.setFontSize(12);
+  doc.text(`Customer: ${quote.customer?.name ?? ''}`, 10, 20);
+  doc.text(`Date: ${new Date().toLocaleDateString()}`, 10, 28);
+
+  let y = 40;
+  for (const item of (quote.items || [])) {
+    const displayName = (item.product?.customerFacingName) || (item.product?.name) || '';
+    const qty = item.qty ?? item.quantity ?? 0;
+    const price = item.unitPrice ?? 0;
+    doc.text(`${displayName} - Qty: ${qty} @ ${price}`, 10, y);
+    y += 8;
+    if (y > doc.internal.pageSize.height - 20) {
+      doc.addPage();
+      y = 20;
+    }
+  }
+  return doc;
+}
+
+export async function generateSalesSheetPDFBuffer(quote: any): Promise<Buffer> {
+  const doc = await generateSalesSheetPDF(quote);
+  return Buffer.from((doc as any).output('arraybuffer'));
+}

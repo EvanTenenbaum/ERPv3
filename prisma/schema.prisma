@@ -23,6 +23,8 @@ model User {
   crmNotesCreated   CrmNote[]        @relation("CreatedBy")
   debtAdjustments   DebtAdjustment[] @relation("CreatedBy")
   photosUploaded    IntakePhoto[]    @relation("UploadedBy")
+  dashboards        Dashboard[]
+  reportDefinitions ReportDefinition[]
 
   @@map("users")
 }
@@ -35,25 +37,104 @@ enum UserRole {
 }
 
 // Product Catalog
+enum UnitOfMeasure {
+  g
+  oz
+  lb
+  ml
+  each
+}
+
+enum PackageType {
+  bulk
+  each
+}
+
+model Package {
+  id   String      @id @default(cuid())
+  type PackageType
+  size Float
+  unit UnitOfMeasure
+  products Product[]
+}
+
+model ServingSize {
+  id  String       @id @default(cuid())
+  qty Float
+  uom UnitOfMeasure
+  products Product[]
+}
+
+enum VarietyType {
+  Hemp
+  Indica
+  Sativa
+  Hybrid
+  Ruderalis
+}
+
+model Variety {
+  id       String      @id @default(cuid())
+  name     String
+  type     VarietyType
+  products      Product[]
+  b2bItems      B2BSaleItem[]
+  inventoryLots InventoryLot[]
+
+  @@unique([name, type])
+}
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  name      String
+  parentId  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent    ProductCategory? @relation("CategoryParent", fields: [parentId], references: [id])
+  children  ProductCategory[] @relation("CategoryParent")
+  products  Product[]
+
+  @@unique([name])
+  @@map("product_categories")
+}
+
 model Product {
   id           String  @id @default(cuid())
   name         String
-  sku          String  @unique // Product SKU
+  sku          String  @unique
   category     String
-  unit         String  @default("piece") // Unit of measure (piece, kg, liter, etc.)
-  defaultPrice Int     // Price in cents
-  location     String? // Storage location
+  unit         String  @default("piece")
+  // New normalized fields (optional for back-compat)
+  uom          UnitOfMeasure?
+  packageId    String?
+  servingId    String?
+  varietyId    String?
+  defaultPrice Int
+  location     String?
   isActive     Boolean @default(true)
+  retailName  String?
+  standardStrainName String?
+  customerFacingName String?
+  categoryRefId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   // Relations
+  package           Package?     @relation(fields: [packageId], references: [id])
+  serving           ServingSize? @relation(fields: [servingId], references: [id])
+  variety           Variety?     @relation(fields: [varietyId], references: [id])
+  categoryRef       ProductCategory? @relation(fields: [categoryRefId], references: [id])
   batches           Batch[]
   orderItems        OrderItem[]
   salesQuoteItems   SalesQuoteItem[]
   priceBookEntries  PriceBookEntry[]
   sampleTransactions SampleTransaction[]
   photos            IntakePhoto[]
+  b2bItems          B2BSaleItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  reservations      Reservation[]
 
   @@map("products")
 }
@@ -63,32 +144,77 @@ model Vendor {
   id          String @id @default(cuid())
   vendorCode  String @unique
   companyName String
-  contactInfo Json   // {email, phone, address, etc}
+  contactInfo Json
+  // CRM fields (optional)
+  licenseNumber String?
+  contactEmail  String?
+  contactPhone  String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+  notes         String?
   isActive    Boolean @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  partyId     String?
 
   // Relations
+  party              Party?            @relation(fields: [partyId], references: [id])
   batches            Batch[]
   accountsPayable    AccountsPayable[]
   crmNotes           CrmNote[]
   sampleTransactions SampleTransaction[]
+  purchaseOrders     PurchaseOrder[]
+  vendorSettlements  VendorSettlement[]
+  vendorRebates      VendorRebate[]
 
   @@map("vendors")
+}
+
+// Party (canonical entity for customers/vendors)
+model Party {
+  id          String   @id @default(cuid())
+  name        String
+  taxId       String?  @unique
+  isCustomer  Boolean  @default(false)
+  isVendor    Boolean  @default(false)
+  contactInfo Json?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customers   Customer[]
+  vendors     Vendor[]
+
+  @@map("parties")
 }
 
 // Customer Management
 model Customer {
   id           String @id @default(cuid())
   companyName  String
-  contactInfo  Json   // {email, phone, address, etc}
-  creditLimit  Int?   // Credit limit in cents
+  contactInfo  Json
+  // CRM fields (optional)
+  licenseNumber String?
+  contactEmail  String?
+  contactPhone  String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+  notes         String?
+  creditLimit  Int?
   paymentTerms String?
   isActive     Boolean @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  partyId      String?
 
   // Relations
+  party              Party?            @relation(fields: [partyId], references: [id])
   orders              Order[]
   salesQuotes         SalesQuote[]
   accountsReceivable  AccountsReceivable[]
@@ -97,6 +223,9 @@ model Customer {
   priceBooks          PriceBook[]
   debtAdjustments     DebtAdjustment[]
   sampleTransactions  SampleTransaction[]
+  customerCredits     CustomerCredit[]
+  reminders           Reminder[]
+  reservations        Reservation[]
 
   @@map("customers")
 }
@@ -111,6 +240,7 @@ model Batch {
   expirationDate   DateTime?
   quantityReceived Int
   quantityAvailable Int
+  isConsignment    Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -122,7 +252,10 @@ model Batch {
   orderItems         OrderItem[]
   sampleTransactions SampleTransaction[]
   photos             IntakePhoto[]
+  reservations       Reservation[]
+  subBatches         SubBatch[]
 
+  @@index([productId])
   @@map("batches")
 }
 
@@ -146,14 +279,42 @@ model InventoryLot {
   quantityOnHand    Int
   quantityAllocated Int
   quantityAvailable Int
+  reservedQty       Int      @default(0)
   lastMovementDate  DateTime
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  // Optional link to variety for analytics
+  varietyId         String?
 
   // Relations
-  batch Batch @relation(fields: [batchId], references: [id])
+  batch     Batch   @relation(fields: [batchId], references: [id])
+  variety   Variety? @relation(fields: [varietyId], references: [id])
+  b2bItems  B2BSaleItem[]
+  writeOffs WriteOffLedger[]
 
+  @@index([quantityAvailable])
+  @@index([lastMovementDate])
   @@map("inventory_lots")
+}
+
+// Reservations
+model Reservation {
+  id         String   @id @default(cuid())
+  customerId String
+  productId  String
+  batchId    String?
+  qty        Int
+  expiresAt  DateTime
+  releasedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+  batch    Batch?   @relation(fields: [batchId], references: [id])
+
+  @@index([expiresAt])
+  @@index([batchId])
+  @@map("reservations")
 }
 
 // Sales Management
@@ -172,6 +333,8 @@ model Order {
   orderItems         OrderItem[]
   accountsReceivable AccountsReceivable[]
 
+  @@index([status, createdAt])
+  @@index([orderDate])
   @@map("orders")
 }
 
@@ -192,6 +355,9 @@ model OrderItem {
   quantity       Int
   unitPrice      Int       // Price in cents
   allocationDate DateTime?
+  // COGS snapshot at allocation time
+  cogsUnitCents  Int?
+  cogsTotalCents Int?
   createdAt      DateTime  @default(now())
 
   // Relations
@@ -210,8 +376,11 @@ model AccountsReceivable {
   invoiceNumber    String   @unique
   invoiceDate      DateTime
   dueDate          DateTime
+  terms            String?
   amount           Int      // Amount in cents
   balanceRemaining Int      // Remaining balance in cents
+  dunningStage     Int      @default(0)
+  lastDunningAt    DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -219,7 +388,11 @@ model AccountsReceivable {
   customer           Customer             @relation(fields: [customerId], references: [id])
   order              Order?               @relation(fields: [orderId], references: [id])
   paymentApplications PaymentApplication[]
+  creditMemos        CreditMemo[]
 
+  @@index([customerId])
+  @@index([balanceRemaining])
+  @@index([invoiceDate])
   @@map("accounts_receivable")
 }
 
@@ -260,6 +433,7 @@ model AccountsPayable {
   invoiceNumber    String
   invoiceDate      DateTime
   dueDate          DateTime
+  terms            String?
   amount           Int      // Amount in cents
   balanceRemaining Int      // Remaining balance in cents
   createdAt        DateTime @default(now())
@@ -267,7 +441,11 @@ model AccountsPayable {
 
   // Relations
   vendor Vendor @relation(fields: [vendorId], references: [id])
+  vendorSettlements VendorSettlement[]
+  vendorRebates     VendorRebate[]
 
+  @@index([vendorId])
+  @@index([dueDate])
   @@map("accounts_payable")
 }
 
@@ -288,6 +466,22 @@ model CrmNote {
   user     User      @relation("CreatedBy", fields: [createdBy], references: [id])
 
   @@map("crm_notes")
+}
+
+model Reminder {
+  id         String   @id @default(cuid())
+  customerId String
+  dueDate    DateTime
+  note       String
+  arId       String?
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([dueDate])
+  @@index([arId])
+  @@map("reminders")
 }
 
 // Sales Quotes
@@ -371,7 +565,39 @@ model PriceBookEntry {
   priceBook PriceBook @relation(fields: [priceBookId], references: [id])
   product   Product   @relation(fields: [productId], references: [id])
 
+  @@index([productId, effectiveDate])
+  @@index([priceBookId, effectiveDate])
   @@map("price_book_entries")
+}
+
+// Credit Memos
+model CreditMemo {
+  id        String   @id @default(cuid())
+  arId      String
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  ar AccountsReceivable @relation(fields: [arId], references: [id])
+
+  @@map("credit_memos")
+}
+
+// Customer Credits
+model CustomerCredit {
+  id           String   @id @default(cuid())
+  customerId   String
+  sourcePaymentId String?
+  amountCents  Int
+  balanceCents Int
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("customer_credits")
 }
 
 // Debt Adjustments
@@ -389,6 +615,33 @@ model DebtAdjustment {
   user     User     @relation("CreatedBy", fields: [createdBy], references: [id])
 
   @@map("debt_adjustments")
+}
+
+// Write-Off / Shrinkage
+model WriteOffLedger {
+  id        String   @id @default(cuid())
+  lotId     String
+  qty       Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  lot InventoryLot @relation(fields: [lotId], references: [id])
+
+  @@map("write_off_ledger")
+}
+
+model SubBatch {
+  id                     String   @id @default(cuid())
+  batchId                String
+  tierName               String
+  qtyAllocated           Int
+  unitCostOverrideCents  Int?
+  createdAt              DateTime @default(now())
+
+  batch Batch @relation(fields: [batchId], references: [id])
+
+  @@index([batchId])
+  @@map("sub_batches")
 }
 
 // Sample Management
@@ -421,6 +674,67 @@ enum SampleTransactionType {
   VENDOR_RETURN
 }
 
+// B2B Sales (non-breaking addition)
+
+enum B2BSaleType {
+  outgoing
+  incoming
+}
+
+enum B2BSaleStatus {
+  DRAFT
+  COMMITTED
+  DEPARTED
+  ARRIVED
+  ACCEPTED
+  REJECTED
+}
+
+model B2BSale {
+  id        String        @id @default(cuid())
+  type      B2BSaleType
+  sourceId  String
+  targetId  String
+  status    B2BSaleStatus @default(DRAFT)
+  departAt  DateTime?
+  arriveAt  DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Relations
+  itemList  B2BSaleItem[]
+  events    EventLog[]
+}
+
+model B2BSaleItem {
+  id          String   @id @default(cuid())
+  b2bSaleId   String
+  inventoryId String?
+  productId   String
+  varietyId   String?
+  unitCount   Float
+  unitPrice   Int
+
+  // Relations
+  b2bSale   B2BSale      @relation(fields: [b2bSaleId], references: [id])
+  inventory InventoryLot? @relation(fields: [inventoryId], references: [id])
+  product   Product      @relation(fields: [productId], references: [id])
+  variety   Variety?     @relation(fields: [varietyId], references: [id])
+}
+
+model EventLog {
+  id         String    @id @default(cuid())
+  b2bSaleId  String?
+  eventType  String
+  data       Json?
+  createdAt  DateTime   @default(now())
+
+  // Relations
+  b2bSale    B2BSale?   @relation(fields: [b2bSaleId], references: [id])
+
+  @@index([b2bSaleId, createdAt])
+}
+
 // Document Management
 model IntakePhoto {
   id         String @id @default(cuid())
@@ -442,3 +756,358 @@ model IntakePhoto {
   @@map("intake_photos")
 }
 
+// Override audit log for pricing changes
+model OverrideAudit {
+  id           String   @id @default(cuid())
+  userId       String
+  timestamp    DateTime @default(now())
+  orderId      String?
+  quoteId      String?
+  lineItemId   String?
+  oldPrice     Int
+  newPrice     Int
+  reason       String
+  overrideType String   // LINE | GLOBAL | ADMIN_FREEFORM
+
+  @@map("override_audit")
+}
+
+// Generic attachments
+model Attachment {
+  id         String   @id @default(cuid())
+  entityType String   // 'product' | 'batch' | 'order' | 'invoice' | 'vendor' | 'customer'
+  entityId   String
+  fileName   String
+  filePath   String
+  mimeType   String
+  fileSize   Int
+  archived   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([entityType, entityId])
+  @@map("attachments")
+}
+
+// System status and posting lock
+model SystemStatus {
+  id             String   @id @default("singleton")
+  postingLocked  Boolean  @default(false)
+  lastReason     String?
+  updatedAt      DateTime @updatedAt
+
+  @@map("system_status")
+}
+
+// Rules engine
+model Rule {
+  id              String   @id @default(cuid())
+  field           String   // InventoryAge | QtyAvailable | ARDays | SalesVolume
+  operator        String   // >, <, >=, <=, ==, !=
+  value           String
+  action          String   // Alert | Flag | CreateTask
+  priority        Int      @default(0)
+  active          Boolean  @default(true)
+  throttleMinutes Int      @default(60)
+  createdAt       DateTime @default(now())
+
+  events          RuleEvent[]
+
+  @@map("rules")
+}
+
+model RuleConflict {
+  id        String   @id @default(cuid())
+  ruleIds   String
+  createdAt DateTime @default(now())
+
+  @@map("rule_conflicts")
+}
+
+// Profitability ledger (nightly)
+model ProfitabilityLedger {
+  id         String   @id @default(cuid())
+  batchId    String?
+  vendorId   String?
+  revenue    Int      @default(0)
+  cogs       Int      @default(0)
+  opex       Int      @default(0)
+  badDebt    Int      @default(0)
+  margin     Int      @default(0)
+  runDate    DateTime @default(now())
+
+  @@index([runDate])
+  @@map("profitability_ledger")
+}
+
+// Purchase Orders
+model PurchaseOrder {
+  id         String   @id @default(cuid())
+  vendorId   String
+  poNumber   String   @unique
+  status     String   @default("OPEN")
+  expectedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id])
+  items  PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id        String   @id @default(cuid())
+  poId      String
+  productId String
+  quantity  Int
+  unitCost  Int
+
+  po      PurchaseOrder @relation(fields: [poId], references: [id])
+  product Product       @relation(fields: [productId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+// Inventory Transfer audit
+model InventoryTransfer {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now())
+  createdBy    String
+  sourceLotId  String
+  destLotId    String?
+  productId    String
+  quantity     Int
+  reason       String?
+  notes        String?
+
+  @@index([sourceLotId])
+  @@index([destLotId])
+  @@index([productId])
+  @@map("inventory_transfers")
+}
+
+// Vendor Settlements & Rebates
+model VendorSettlement {
+  id            String   @id @default(cuid())
+  vendorId      String
+  periodStart   DateTime
+  periodEnd     DateTime
+  amount        Int
+  notes         String?
+  appliedToApId String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  vendor      Vendor           @relation(fields: [vendorId], references: [id])
+  appliedToAp AccountsPayable? @relation(fields: [appliedToApId], references: [id])
+
+  @@index([vendorId])
+  @@index([appliedToApId])
+  @@map("vendor_settlements")
+}
+
+model VendorRebate {
+  id            String   @id @default(cuid())
+  vendorId      String
+  basis         String
+  amount        Int
+  notes         String?
+  appliedToApId String?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  vendor      Vendor           @relation(fields: [vendorId], references: [id])
+  appliedToAp AccountsPayable? @relation(fields: [appliedToApId], references: [id])
+
+  @@index([vendorId])
+  @@index([appliedToApId])
+  @@map("vendor_rebates")
+}
+
+// Server-side cart reservations
+model CartReservation {
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  createdBy      String
+  productId      String
+  inventoryLotId String
+  quantity       Int
+
+  @@index([inventoryLotId])
+  @@index([productId])
+  @@map("cart_reservations")
+}
+
+// Analytics & Reporting
+
+enum DashboardVisibility {
+  PRIVATE
+  SHARED
+  ORG_DEFAULT
+}
+
+enum ReportVisibility {
+  PRIVATE
+  SHARED
+  TEMPLATE
+}
+
+enum ReportDomain {
+  SALES
+  FINANCE
+  INVENTORY
+  OPERATIONS
+}
+
+enum AlertScope {
+  REPORT
+}
+
+model Dashboard {
+  id            String   @id @default(cuid())
+  ownerUserId   String
+  name          String
+  description   String?
+  layout        Json
+  locked        Boolean  @default(false)
+  isTemplate    Boolean  @default(false)
+  roleScope     UserRole?
+  visibility    DashboardVisibility @default(PRIVATE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner         User     @relation(fields: [ownerUserId], references: [id])
+  widgets       ReportWidget[]
+
+  @@index([ownerUserId])
+}
+
+model ReportDefinition {
+  id              String   @id @default(cuid())
+  ownerUserId     String
+  name            String
+  description     String?
+  domain          ReportDomain
+  spec            Json
+  presentation    Json
+  visibility      ReportVisibility @default(PRIVATE)
+  snapshotOfId    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  owner           User @relation(fields: [ownerUserId], references: [id])
+  snapshots       ReportSnapshot[]
+  widgets         ReportWidget[]
+  alerts          Alert[]
+
+  @@index([ownerUserId])
+}
+
+model ReportSnapshot {
+  id            String   @id @default(cuid())
+  reportId      String
+  takenAt       DateTime @default(now())
+  spec          Json
+  presentation  Json
+  data          Json
+  takenByUserId String
+
+  report        ReportDefinition @relation(fields: [reportId], references: [id])
+  widgets       ReportWidget[]
+
+  @@index([reportId, takenAt])
+}
+
+model ReportWidget {
+  id           String   @id @default(cuid())
+  dashboardId  String
+  reportId     String
+  snapshotId   String?
+  title        String?
+  position     Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dashboard    Dashboard       @relation(fields: [dashboardId], references: [id])
+  report       ReportDefinition @relation(fields: [reportId], references: [id])
+  snapshot     ReportSnapshot?  @relation(fields: [snapshotId], references: [id])
+
+  @@index([dashboardId])
+}
+
+model Alert {
+  id            String   @id @default(cuid())
+  ownerUserId   String
+  reportId      String
+  scope         AlertScope @default(REPORT)
+  condition     Json
+  active        Boolean   @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  report        ReportDefinition @relation(fields: [reportId], references: [id])
+
+  @@index([reportId])
+}
+
+// Discounts
+model DiscountRule {
+  id            String   @id @default(cuid())
+  name          String
+  type          String   // 'PERCENT' | 'FIXED'
+  value         Int      // cents if FIXED; basis points if PERCENT
+  scope         String   // 'PRODUCT' | 'CATEGORY' | 'CUSTOMER'
+  productId     String?
+  category      String?
+  customerId    String?
+  exclusive     Boolean  @default(false)
+  active        Boolean  @default(true)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+}
+
+// Ranking
+model Ranking {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  score      Int
+  computedAt DateTime @default(now())
+
+  @@unique([entityType, entityId], name: "entityType_entityId")
+}
+
+// Alert emission tracking
+model RuleEvent {
+  id         String   @id @default(cuid())
+  ruleId     String
+  entityType String?
+  entityId   String?
+  createdAt  DateTime @default(now())
+
+  rule       Rule     @relation(fields: [ruleId], references: [id])
+
+  @@index([ruleId, entityType, entityId, createdAt])
+}
+
+// Cycle count planning
+model CycleCountPlan {
+  id        String   @id @default(cuid())
+  name      String
+  strategy  String   // 'ABC' | 'ALL'
+  createdAt DateTime @default(now())
+  tasks     CycleCountTask[]
+}
+
+model CycleCountTask {
+  id          String   @id @default(cuid())
+  planId      String
+  lotId       String
+  expectedQty Int
+  countedQty  Int?
+  status      String   @default("OPEN") // OPEN|COUNTED|APPLIED
+  createdAt   DateTime @default(now())
+
+  plan        CycleCountPlan @relation(fields: [planId], references: [id])
+}
